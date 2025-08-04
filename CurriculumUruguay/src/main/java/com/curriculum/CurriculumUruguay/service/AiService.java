@@ -3,14 +3,18 @@ package com.curriculum.CurriculumUruguay.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,15 +50,40 @@ public class AiService {
         HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(requestData, headers);
         
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            // First, make the request and get the raw response entity without type conversion
+            ResponseEntity<byte[]> response = restTemplate.exchange(
                 agentUrl + "/text",
                 HttpMethod.POST,
                 requestEntity,
-                Map.class
+                byte[].class
             );
-            
-            logger.info("---------- sendTextToAi ---------- Response: {}", response.getBody());
-            return response.getBody();
+
+            // Create a response map to return
+            Map<String, Object> responseMap = new HashMap<>();
+
+            // Handle JSON response - parse the byte array back to a Map
+            try {
+                String jsonString = new String(response.getBody());
+                ObjectMapper mapper = new ObjectMapper();
+                responseMap = mapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {});
+            } catch (IOException e) {
+                logger.error("Error parsing JSON response: {}", e.getMessage(), e);
+                responseMap.put("message", "Error parsing JSON response");
+            }
+
+            logger.info("---------- sendTextToAi ---------- responseMap: {}", responseMap);
+
+            // Extract nested "message" map
+            Map<String, Object> messageMap = (Map<String, Object>) responseMap.get("message");
+
+            String messageText = (String) messageMap.get("message");
+            String status = (String) messageMap.get("status");
+            String pdfFilename = (String) messageMap.get("pdfFilename");
+
+            logger.info("---------- sendTextToAi ---------- status: {}", status);
+            logger.info("---------- sendTextToAi ---------- pdfFilename: {}", pdfFilename);
+            logger.info("---------- sendTextToAi ---------- messageText: {}", messageText);
+            return responseMap;
         } catch (Exception e) {
             logger.error("Error sending text to AI: {}", e.getMessage(), e);
             throw new RuntimeException("Error sending text to AI", e);
@@ -71,6 +100,13 @@ public class AiService {
     public Map<String, Object> sendImageToAi(String from, String userMessage, byte[] imageData) {
         logger.info("---------- sendImageToAi ---------- input from: {}, message: {}", from, userMessage);
         
+        // Log image data presence and size
+        if (imageData == null) {
+            logger.error("Image data is null");
+        } else {
+            logger.info("Image data is present, size: {} bytes", imageData.length);
+        }
+        
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         
@@ -84,13 +120,25 @@ public class AiService {
             body.add("userMessage", "This is the profile image");
         }
         
-        // Add image data
-        HttpHeaders imageHeaders = new HttpHeaders();
-        imageHeaders.setContentType(MediaType.IMAGE_JPEG);
-        HttpEntity<byte[]> imageEntity = new HttpEntity<>(imageData, imageHeaders);
-        body.add("image", imageEntity);
+        // Add image data using ByteArrayResource instead of HttpEntity
+        if (imageData != null && imageData.length > 0) {
+            ByteArrayResource imageResource = new ByteArrayResource(imageData) {
+                @Override
+                public String getFilename() {
+                    return "image.jpg"; // Provide a filename for the multipart request
+                }
+            };
+            body.add("image", imageResource);
+            logger.info("Added image to request as ByteArrayResource");
+        } else {
+            logger.error("Cannot add image to request: image data is empty or null");
+        }
         
         HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
+        
+        // Log request details
+        logger.info("Request headers: {}", headers);
+        logger.info("Request body contains keys: {}", body.keySet());
         
         try {
             ResponseEntity<Map> response = restTemplate.exchange(

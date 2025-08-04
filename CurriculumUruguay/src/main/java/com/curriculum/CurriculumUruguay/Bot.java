@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -160,49 +161,50 @@ public class Bot extends TelegramLongPollingBot {
             sendText(userId, "Lo siento, no pude obtener una respuesta del servicio. Por favor intenta nuevamente.");
             return;
         }
-        
-        // Check if the response contains a message map
-        if (aiResponse.containsKey("message") && aiResponse.get("message") instanceof Map) {
-            Map<String, Object> messageMap = (Map<String, Object>) aiResponse.get("message");
+        // Extract nested "message" map
+        Map<String, Object> messageMap = (Map<String, Object>) aiResponse.get("message");
 
-            // Send text message if available
-            if (messageMap.containsKey("message")) {
-                String textMessage = (String) messageMap.get("message");
-                sendText(userId, textMessage);
-            }
-            
-            // Send PDF if available
-            if (messageMap.containsKey("pdfData")) {
-                try {
-                    String pdfData = (String) messageMap.get("pdfData");
-                    logger.info("PDF data received: {}", pdfData != null ? "[data available]" : "null");
-                    
-                    // Check if pdfData is null or empty
-                    if (pdfData == null || pdfData.isEmpty()) {
-                        logger.warn("PDF data is null or empty");
-                        return;
-                    }
-                    
-                    String filename = messageMap.containsKey("pdfFilename") ? 
-                            (String) messageMap.get("pdfFilename") : "curriculum.pdf";
-                    
-                    try {
-                        // Convert Base64 string to byte array
-                        byte[] pdfBytes = java.util.Base64.getDecoder().decode(pdfData);
-                        
-                        // Send the PDF
-                        sendPdfWithCaption(userId, pdfBytes, filename, "Aquí está tu curriculum generado");
-                    } catch (IllegalArgumentException e) {
-                        // This exception is thrown when the input is not valid Base64
-                        logger.error("Invalid Base64 data for PDF: {}", e.getMessage());
-                        sendText(userId, "Lo siento, los datos del PDF no son válidos. Por favor intenta nuevamente.");
-                    }
-                } catch (Exception e) {
-                    logger.error("Error processing PDF data: {}", e.getMessage(), e);
-                    sendText(userId, "Lo siento, ocurrió un error al procesar el PDF. Por favor intenta nuevamente.");
+
+        // Send PDF if available
+        if (messageMap.containsKey("pdfData") && messageMap.get("pdfData") != null) {
+            try {
+                String pdfData = (String) messageMap.get("pdfData");
+                logger.info("PDF data received: [data available]");
+
+                if (pdfData.isEmpty()) {
+                    logger.warn("PDF data is empty");
+                    return;
                 }
+
+                String filename = messageMap.containsKey("pdfFilename") && messageMap.get("pdfFilename") != null ?
+                        (String) messageMap.get("pdfFilename") : "curriculum.pdf";
+
+                try {
+                    byte[] pdfBytes = Base64.getDecoder().decode(pdfData);
+
+                    String textMessage = (String) messageMap.get("message");
+
+                    // Send the PDF
+                    sendPdfWithCaption(userId, pdfBytes, filename, textMessage);
+
+                    return;
+                } catch (IllegalArgumentException e) {
+                    // This exception is thrown when the input is not valid Base64
+                    logger.error("Invalid Base64 data for PDF: {}", e.getMessage());
+                    sendText(userId, "Lo siento, los datos del PDF no son válidos. Por favor intenta nuevamente.");
+                }
+            } catch (Exception e) {
+                logger.error("Error processing PDF data: {}", e.getMessage(), e);
+                sendText(userId, "Lo siento, ocurrió un error al procesar el PDF. Por favor intenta nuevamente.");
             }
-        } else {
+        }
+        // Send text message if available
+        if (messageMap.containsKey("message") && messageMap.get("message") instanceof String) {
+            String textMessage = (String) messageMap.get("message");
+            sendText(userId, textMessage);
+        }
+
+         else if (!aiResponse.containsKey("message")) {
             // If the response format is unexpected, send a generic message
             sendText(userId, "He recibido tu mensaje, pero no pude procesar la respuesta correctamente.");
         }
@@ -212,16 +214,25 @@ public class Bot extends TelegramLongPollingBot {
      * Download photo data from Telegram servers
      */
     private byte[] downloadPhotoData(String fileId) throws IOException, TelegramApiException {
+        logger.info("Downloading photo with fileId: {}", fileId);
+        
         // Get file path from Telegram servers
         String filePath = getFile(fileId);
+        logger.info("Retrieved file path from Telegram: {}", filePath);
         
         // Get the file URL
         String fileUrl = "https://api.telegram.org/file/bot" + botToken + "/" + filePath;
+        logger.info("File URL: {}", fileUrl);
         
         // Download the file
         URL url = new URL(fileUrl);
         try (InputStream inputStream = url.openStream()) {
-            return inputStream.readAllBytes();
+            byte[] imageData = inputStream.readAllBytes();
+            logger.info("Successfully downloaded image data, size: {} bytes", imageData.length);
+            return imageData;
+        } catch (IOException e) {
+            logger.error("Error downloading image data: {}", e.getMessage());
+            throw e;
         }
     }
 
