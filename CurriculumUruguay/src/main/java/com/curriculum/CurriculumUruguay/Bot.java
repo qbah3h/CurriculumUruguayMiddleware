@@ -101,6 +101,10 @@ public class Bot extends TelegramLongPollingBot {
         Message message = update.getMessage();
         Long userId = message.getFrom().getId();
         String text = message.getText();
+
+        if(text.equals("/start")) {
+            return;
+        }
         
         logger.info("Processing text message from user {}: {}", userId, text);
         
