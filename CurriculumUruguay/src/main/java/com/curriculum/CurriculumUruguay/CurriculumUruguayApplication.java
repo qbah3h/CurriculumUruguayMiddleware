@@ -19,7 +19,10 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 public class CurriculumUruguayApplication {
 
 	@Autowired
-	private Bot bot;
+	private Bot bot0;
+
+	@Autowired
+	private MyTelegramBot bot;
 
 	public static void main(String[] args) {
 		SpringApplication.run(CurriculumUruguayApplication.class, args);

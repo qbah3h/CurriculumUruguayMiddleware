@@ -102,12 +102,12 @@ public class Bot extends TelegramLongPollingBot {
         Long userId = message.getFrom().getId();
         String text = message.getText();
 
+        logger.info("Processing text message from user {}: {}", userId, text);
+
         if(text.equals("/start")) {
             return;
         }
-        
-        logger.info("Processing text message from user {}: {}", userId, text);
-        
+
         // Send text to AI service
         Map<String, Object> aiResponse = aiService.sendTextToAi(userId.toString(), text);
         
