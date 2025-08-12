@@ -1,6 +1,8 @@
 package com.curriculum.CurriculumUruguay;
 
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -18,11 +20,10 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 })
 public class CurriculumUruguayApplication {
 
-	@Autowired
-	private Bot bot0;
+	private static final Logger log = LoggerFactory.getLogger(CurriculumUruguayApplication.class);
 
 	@Autowired
-	private MyTelegramBot bot;
+	private TelegramBot bot;
 
 	public static void main(String[] args) {
 		SpringApplication.run(CurriculumUruguayApplication.class, args);
@@ -31,6 +32,6 @@ public class CurriculumUruguayApplication {
 	@PostConstruct
 	public void initBot() throws TelegramApiException {
 		TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
-		botsApi.registerBot(bot);
+			botsApi.registerBot(bot);
 	}
 }

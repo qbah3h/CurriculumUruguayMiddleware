@@ -1,17 +1,38 @@
 package com.curriculum.CurriculumUruguay;
+import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+@Component
 public class MyTelegramBot extends TelegramLongPollingBot {
+
+    @Value("${telegram.bot.username}")
+    private String botUsername;
+
+    @Value("${telegram.bot.token}")
+    private String botToken;
+
+    
+    @Override
+    public String getBotUsername() {
+        return botUsername;
+    }
+
+    @Override
+    public String getBotToken() {
+        return botToken;
+    }
 
     @Override
     public void onUpdateReceived(Update update) {
@@ -32,43 +53,41 @@ public class MyTelegramBot extends TelegramLongPollingBot {
     }
 
     private void sendImageChoiceMenu(Long chatId) throws TelegramApiException {
-        SendMessage message = new SendMessage();
-        message.setChatId(chatId);
-        message.setText("Choose an image:");
+    sendImageWithButton(chatId, "templates/plain.jpeg", "Image 1", "image1");
+    sendImageWithButton(chatId, "templates/modern.jpeg", "Image 2", "image2");
+    sendImageWithButton(chatId, "templates/plain.jpeg", "Image 3", "image3");
+}
 
-        // Create buttons
-        InlineKeyboardButton img1 = new InlineKeyboardButton("Image 1");
-        img1.setCallbackData("plain");
-
-        InlineKeyboardButton img2 = new InlineKeyboardButton("Image 2");
-        img2.setCallbackData("modern");
-
-        InlineKeyboardButton img3 = new InlineKeyboardButton("Image 3");
-        img3.setCallbackData("modern");
-
-        // Arrange buttons in a row
-        List<InlineKeyboardButton> row = new ArrayList<>();
-        row.add(img1);
-        row.add(img2);
-        row.add(img3);
-
-        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        rows.add(row);
-
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
-        markup.setKeyboard(rows);
-
-        message.setReplyMarkup(markup);
-
-        execute(message);
+private void sendImageWithButton(Long chatId, String imagePath, String buttonText, String callbackData) throws TelegramApiException {
+    InputStream imageStream = getClass().getClassLoader().getResourceAsStream(imagePath);
+    if (imageStream == null) {
+        System.err.println("Image not found: " + imagePath);
+        return;
     }
+
+    // Create button for this image
+    InlineKeyboardButton button = new InlineKeyboardButton(buttonText);
+    button.setCallbackData(callbackData);
+    List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+    keyboard.add(List.of(button));
+    InlineKeyboardMarkup markup = new InlineKeyboardMarkup(keyboard);
+
+    // Send photo with inline button
+    SendPhoto photo = new SendPhoto();
+    photo.setChatId(chatId.toString());
+    photo.setPhoto(new InputFile(imageStream, imagePath));
+    photo.setReplyMarkup(markup);
+
+    execute(photo);
+}
+
 
     private void sendSelectedImage(Long chatId, String imageKey) throws TelegramApiException {
         String imagePath;
         switch (imageKey) {
-            case "image1": imagePath = "templates/plain.jpg"; break;
-            case "image2": imagePath = "templates/modern.jpg"; break;
-            case "image3": imagePath = "templates/modern.jpg"; break;
+            case "image1": imagePath = "templates/plain.jpeg"; break;
+            case "image2": imagePath = "templates/modern.jpeg"; break;
+            case "image3": imagePath = "templates/modern.jpeg"; break;
             default: return;
         }
 
@@ -81,18 +100,8 @@ public class MyTelegramBot extends TelegramLongPollingBot {
 
         SendPhoto photo = new SendPhoto();
         photo.setChatId(chatId.toString());
-        photo.setPhoto(imageStream);
+        photo.setPhoto(new InputFile(imageStream, imagePath));
 
         execute(photo);
-    }
-
-    @Override
-    public String getBotUsername() {
-        return "YOUR_BOT_USERNAME";
-    }
-
-    @Override
-    public String getBotToken() {
-        return "YOUR_BOT_TOKEN";
     }
 }
