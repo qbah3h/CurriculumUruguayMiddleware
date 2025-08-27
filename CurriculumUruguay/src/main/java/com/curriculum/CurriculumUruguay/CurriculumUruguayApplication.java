@@ -23,7 +23,7 @@ public class CurriculumUruguayApplication {
 	private static final Logger log = LoggerFactory.getLogger(CurriculumUruguayApplication.class);
 
 	@Autowired
-	private TelegramBot bot;
+	private Bot bot;
 
 	public static void main(String[] args) {
 		SpringApplication.run(CurriculumUruguayApplication.class, args);
